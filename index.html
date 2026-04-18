@@ -1,0 +1,2805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Ultimate Flashcards — Learn German</title>
+
+    <!-- SEO Meta -->
+    <meta name="description" content="A premium spaced-repetition flashcard app for mastering German vocabulary. Study with 3D cards, OCR scanning, and customizable review intervals.">
+    <meta name="theme-color" content="#6366f1">
+
+    <!-- PWA Meta -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Flashcards">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+    <link rel="apple-touch-icon" href="icons/icon-180.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tesseract.js for OCR -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        /* ============================================
+           DESIGN TOKENS
+           ============================================ */
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --primary-subtle: rgba(99, 102, 241, 0.08);
+            --accent: #ec4899;
+            --accent-light: #f472b6;
+            --accent-dark: #db2777;
+            --success: #10b981;
+            --success-light: rgba(16, 185, 129, 0.12);
+            --danger: #ef4444;
+            --danger-light: rgba(239, 68, 68, 0.1);
+            --warning: #f59e0b;
+            --info: #0ea5e9;
+            --info-light: rgba(14, 165, 233, 0.1);
+
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-400: #9ca3af;
+            --gray-500: #6b7280;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+
+            --glass-bg: rgba(255, 255, 255, 0.72);
+            --glass-border: rgba(255, 255, 255, 0.4);
+            --glass-shadow: 0 8px 32px rgba(99, 102, 241, 0.08);
+
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+            --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.15);
+
+            --radius: 14px;
+            --radius-lg: 20px;
+            --radius-full: 50px;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* ============================================
+           RESET & BASE
+           ============================================ */
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            color: var(--gray-800);
+            line-height: 1.6;
+            overscroll-behavior: none;
+            -webkit-overflow-scrolling: touch;
+
+            /* Animated gradient background */
+            background: linear-gradient(135deg, #e0e7ff 0%, #fce7f3 25%, #ede9fe 50%, #e0f2fe 75%, #fce7f3 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 20s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            25% { background-position: 100% 0%; }
+            50% { background-position: 100% 100%; }
+            75% { background-position: 0% 100%; }
+        }
+
+        /* PWA standalone mode */
+        @media all and (display-mode: standalone) {
+            body {
+                padding-top: max(1rem, env(safe-area-inset-top));
+            }
+        }
+
+        /* ============================================
+           LAYOUT
+           ============================================ */
+        .app-wrapper {
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 2rem 1.25rem;
+            padding-top: max(2rem, env(safe-area-inset-top));
+            padding-bottom: max(2rem, env(safe-area-inset-bottom));
+            padding-left: max(1.25rem, env(safe-area-inset-left));
+            padding-right: max(1.25rem, env(safe-area-inset-right));
+            position: relative;
+        }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            font-size: 0.85rem;
+            color: var(--gray-400);
+            font-weight: 500;
+            margin-top: 0.25rem;
+        }
+
+        .header::after {
+            content: '';
+            display: block;
+            width: 48px;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            margin: 0.75rem auto 0;
+            border-radius: 2px;
+        }
+
+        /* ============================================
+           GLASS CARD (shared component)
+           ============================================ */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--glass-shadow);
+            padding: 1.75rem;
+            margin-bottom: 1.25rem;
+            transition: transform var(--transition), box-shadow var(--transition);
+        }
+
+        .glass-card:hover {
+            box-shadow: var(--glass-shadow), var(--shadow-glow);
+        }
+
+        .section-label {
+            font-size: 0.7rem;
+            color: var(--gray-400);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .section-label::before {
+            content: '';
+            width: 3px;
+            height: 14px;
+            background: linear-gradient(180deg, var(--primary), var(--accent));
+            border-radius: 2px;
+        }
+
+        /* ============================================
+           STUDY STATUS BANNER
+           ============================================ */
+        .study-status {
+            text-align: center;
+            padding: 2.25rem 1.75rem;
+        }
+
+        .due-count {
+            font-size: 4rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.1;
+            animation: countPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes countPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+        }
+
+        .due-count.none {
+            background: linear-gradient(135deg, var(--success) 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: none;
+        }
+
+        .due-label {
+            color: var(--gray-400);
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+        }
+
+        .study-btn {
+            padding: 0.875rem 2.5rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius-full);
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.35);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .study-btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .study-btn:hover::before {
+            left: 100%;
+        }
+
+        .study-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(99, 102, 241, 0.45);
+        }
+
+        .study-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .study-btn:disabled {
+            background: var(--gray-200);
+            color: var(--gray-400);
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        .study-btn:disabled::before {
+            display: none;
+        }
+
+        .direction-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.875rem;
+            background: rgba(99, 102, 241, 0.08);
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
+            color: var(--primary);
+            font-weight: 600;
+            margin-top: 1rem;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .direction-badge svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* ============================================
+           ADD CARD FORM
+           ============================================ */
+        .form-row {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .form-row input {
+            flex: 1;
+            padding: 0.875rem 1rem;
+            border: 2px solid transparent;
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all var(--transition);
+            background: rgba(99, 102, 241, 0.04);
+            color: var(--gray-800);
+        }
+
+        .form-row input:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: 0 0 0 4px var(--primary-subtle), var(--shadow-sm);
+        }
+
+        .form-row input::placeholder {
+            color: var(--gray-400);
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn-scan {
+            width: 100%;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-scan:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .btn-scan svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* ============================================
+           IMPORT / EXPORT
+           ============================================ */
+        .import-export-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .import-export-buttons button {
+            flex: 1;
+            padding: 0.875rem;
+            border: 2px solid rgba(99, 102, 241, 0.15);
+            background: rgba(99, 102, 241, 0.04);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+            color: var(--gray-600);
+        }
+
+        .import-export-buttons button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-subtle);
+            transform: translateY(-1px);
+        }
+
+        .file-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-input-wrapper .file-btn {
+            width: 100%;
+            padding: 0.875rem;
+            border: 2px dashed var(--primary-light);
+            background: var(--primary-subtle);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary);
+            text-align: center;
+            transition: all var(--transition);
+        }
+
+        .file-input-wrapper:hover .file-btn {
+            background: rgba(99, 102, 241, 0.12);
+            border-color: var(--primary);
+            transform: translateY(-1px);
+        }
+
+        .import-result {
+            margin-top: 1rem;
+            padding: 0.875rem 1.25rem;
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 500;
+            animation: slideUp 0.3s ease;
+        }
+
+        .import-result.success {
+            background: var(--success-light);
+            color: #065f46;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .import-result.error {
+            background: var(--danger-light);
+            color: #991b1b;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        /* ============================================
+           3D FLASHCARD
+           ============================================ */
+        .flashcard-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .flashcard-container {
+            perspective: 1500px;
+            margin-bottom: 1.25rem;
+            position: relative;
+        }
+
+        .flashcard {
+            width: 100%;
+            height: 240px;
+            cursor: pointer;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.7s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+
+        .flashcard.no-transition {
+            transition: none !important;
+        }
+
+        .flashcard-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-size: 2rem;
+            font-weight: 700;
+            border-radius: var(--radius-lg);
+            padding: 2.5rem 2rem 1.5rem;
+            box-sizing: border-box;
+            overflow-y: auto;
+            word-break: break-word;
+            text-align: center;
+        }
+
+        .flashcard-front {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            color: var(--gray-800);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-lg), var(--shadow-glow);
+        }
+
+        .flashcard-back {
+            background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 50%, var(--accent-dark) 100%);
+            color: white;
+            transform: rotateY(180deg);
+            box-shadow: var(--shadow-lg), 0 0 50px rgba(99, 102, 241, 0.25);
+        }
+
+        .flashcard-back .example {
+            font-size: 0.95rem;
+            font-weight: 400;
+            font-style: italic;
+            opacity: 0.85;
+            margin-top: 1rem;
+            text-align: center;
+            padding: 0 1rem;
+            line-height: 1.5;
+        }
+
+        .flashcard-direction {
+            position: absolute;
+            top: 0.75rem;
+            left: 0.75rem;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(8px);
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-full);
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            z-index: 10;
+            border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .flashcard-edit-btn {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(99, 102, 241, 0.15);
+            color: var(--gray-500);
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: inherit;
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-full);
+            transition: all var(--transition);
+            z-index: 10;
+        }
+
+        .flashcard-edit-btn:hover {
+            background: white;
+            color: var(--primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .card-counter {
+            text-align: center;
+            color: var(--gray-400);
+            margin-bottom: 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .flip-hint {
+            text-align: center;
+            color: var(--gray-400);
+            font-size: 0.85rem;
+            margin-top: 0.75rem;
+            font-weight: 500;
+            animation: hintPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes hintPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+
+        /* ============================================
+           REVIEW BUTTONS
+           ============================================ */
+        .review-buttons {
+            display: none;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.25rem;
+            flex-wrap: wrap;
+            animation: slideUp 0.4s ease;
+        }
+
+        .review-buttons.visible {
+            display: flex;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .review-btn {
+            padding: 0.7rem 1.25rem;
+            border: none;
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 700;
+            font-family: inherit;
+            transition: all var(--transition);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .review-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: width 0.4s, height 0.4s;
+        }
+
+        .review-btn:active::after {
+            width: 200px;
+            height: 200px;
+        }
+
+        .review-btn.wrong {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            box-shadow: 0 3px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .review-btn.correct {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            box-shadow: 0 3px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .review-btn.semi-easy {
+            background: linear-gradient(135deg, var(--info) 0%, #0284c7 100%);
+            box-shadow: 0 3px 12px rgba(14, 165, 233, 0.3);
+        }
+
+        .review-btn.easy {
+            background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+            box-shadow: 0 3px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .review-btn.one-month {
+            background: linear-gradient(135deg, var(--warning) 0%, #d97706 100%);
+            box-shadow: 0 3px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .review-btn.two-months {
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+            box-shadow: 0 3px 12px rgba(236, 72, 153, 0.3);
+        }
+
+        .review-btn:hover {
+            transform: translateY(-2px) scale(1.03);
+        }
+
+        /* Scheduling Preview */
+        .scheduling-preview {
+            display: none;
+            text-align: center;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(99, 102, 241, 0.04);
+            border-radius: var(--radius);
+            border: 1px solid rgba(99, 102, 241, 0.1);
+            animation: slideUp 0.4s ease;
+        }
+
+        .scheduling-preview.visible {
+            display: block;
+        }
+
+        .scheduling-preview .preview-title {
+            font-size: 0.7rem;
+            color: var(--gray-400);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+        }
+
+        .scheduling-preview .preview-options {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .scheduling-preview .preview-label {
+            font-size: 0.7rem;
+            color: var(--gray-400);
+            margin-bottom: 0.25rem;
+        }
+
+        .scheduling-preview .preview-date {
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+
+        .scheduling-preview .preview-option.wrong .preview-date { color: var(--danger); }
+        .scheduling-preview .preview-option.correct .preview-date { color: var(--success); }
+        .scheduling-preview .preview-option.semi-easy .preview-date { color: var(--info); }
+        .scheduling-preview .preview-option.easy .preview-date { color: var(--primary); }
+        .scheduling-preview .preview-option.one-month .preview-date { color: var(--warning); }
+        .scheduling-preview .preview-option.two-months .preview-date { color: var(--accent); }
+
+        /* Nav Buttons */
+        .nav-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .nav-buttons button {
+            padding: 0.75rem 1.75rem;
+            border: 2px solid rgba(99, 102, 241, 0.15);
+            background: var(--glass-bg);
+            backdrop-filter: blur(8px);
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            color: var(--gray-600);
+            transition: all var(--transition);
+        }
+
+        .nav-buttons button:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-subtle);
+            transform: translateY(-1px);
+        }
+
+        .nav-buttons button:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        .exit-study-btn {
+            padding: 0.625rem 1.25rem;
+            background: rgba(255,255,255,0.7);
+            backdrop-filter: blur(8px);
+            color: var(--gray-500);
+            border: 1px solid var(--glass-border);
+            border-radius: var(--radius-full);
+            font-size: 0.85rem;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            margin-bottom: 1.25rem;
+            transition: all var(--transition);
+        }
+
+        .exit-study-btn:hover {
+            background: white;
+            color: var(--gray-700);
+        }
+
+        /* ============================================
+           CARD LIST
+           ============================================ */
+        .card-list-section ul {
+            list-style: none;
+        }
+
+        .card-list-section li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.125rem 0;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.06);
+            transition: background var(--transition);
+        }
+
+        .card-list-section li:last-child {
+            border-bottom: none;
+            padding-bottom: 0.25rem;
+        }
+
+        .card-list-section li:first-child {
+            padding-top: 0.5rem;
+        }
+
+        .card-info { flex: 1; }
+
+        .card-text {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.25rem;
+            flex-wrap: wrap;
+        }
+
+        .card-text .german {
+            font-weight: 700;
+            color: var(--gray-800);
+        }
+
+        .card-text .english {
+            color: var(--gray-500);
+        }
+
+        .card-example {
+            font-size: 0.8rem;
+            color: var(--gray-400);
+            font-style: italic;
+            margin-top: 0.25rem;
+        }
+
+        .card-meta {
+            font-size: 0.75rem;
+            color: var(--gray-400);
+            margin-top: 0.25rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .card-meta .due {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .card-meta .due-today {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .card-actions {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+        }
+
+        .edit-btn, .delete-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem 0.625rem;
+            border-radius: var(--radius);
+            transition: all var(--transition);
+            font-family: inherit;
+        }
+
+        .edit-btn {
+            color: var(--gray-400);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .edit-btn:hover {
+            color: var(--primary);
+            background: var(--primary-subtle);
+        }
+
+        .delete-btn {
+            color: var(--gray-400);
+            font-size: 1.25rem;
+        }
+
+        .delete-btn:hover {
+            color: var(--danger);
+            background: var(--danger-light);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--gray-400);
+            font-weight: 500;
+        }
+
+        /* Study Complete */
+        .study-complete {
+            padding: 3rem 2rem;
+            text-align: center;
+            animation: slideUp 0.5s ease;
+        }
+
+        .study-complete h2 {
+            color: var(--success);
+            margin-bottom: 0.75rem;
+            font-size: 1.5rem;
+        }
+
+        .study-complete p {
+            color: var(--gray-500);
+            margin-bottom: 1.5rem;
+        }
+
+        /* ============================================
+           FLOATING SETTINGS BUTTON
+           ============================================ */
+        .fab-settings {
+            position: fixed;
+            bottom: max(2rem, env(safe-area-inset-bottom, 2rem));
+            right: 1.5rem;
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 6px 24px rgba(99, 102, 241, 0.4);
+            z-index: 500;
+            transition: all var(--transition);
+        }
+
+        .fab-settings:hover {
+            transform: scale(1.1) rotate(30deg);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.5);
+        }
+
+        .fab-settings:active {
+            transform: scale(0.95);
+        }
+
+        .fab-settings svg {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .fab-settings.active svg {
+            transform: rotate(180deg);
+        }
+
+        /* ============================================
+           MODAL (shared)
+           ============================================ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(17, 24, 39, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 480px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow-xl), var(--shadow-glow);
+            animation: modalIn 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalIn {
+            from {
+                opacity: 0;
+                transform: scale(0.92) translateY(16px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .modal h2 {
+            font-size: 1.25rem;
+            color: var(--gray-800);
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+        }
+
+        .modal .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .modal label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--gray-500);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .modal input[type="text"] {
+            width: 100%;
+            padding: 0.875rem 1rem;
+            border: 2px solid transparent;
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: all var(--transition);
+            background: rgba(99, 102, 241, 0.04);
+        }
+
+        .modal input[type="text"]:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: 0 0 0 4px var(--primary-subtle);
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.75rem;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 0.875rem;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .cancel-btn {
+            background: var(--gray-100);
+            color: var(--gray-600);
+        }
+
+        .cancel-btn:hover {
+            background: var(--gray-200);
+        }
+
+        .save-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+        }
+
+        .save-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+        }
+
+        /* ============================================
+           SETTINGS MODAL specifics
+           ============================================ */
+        .settings-form .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .settings-form .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .settings-form .input-with-suffix {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .settings-form input[type="number"] {
+            width: 80px;
+            padding: 0.75rem;
+            border: 2px solid transparent;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+            text-align: center;
+            background: rgba(99, 102, 241, 0.04);
+            transition: all var(--transition);
+        }
+
+        .settings-form input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: 0 0 0 4px var(--primary-subtle);
+        }
+
+        .settings-form .input-suffix {
+            color: var(--gray-400);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .settings-form .color-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.375rem;
+        }
+
+        .settings-form .color-indicator.wrong { background: var(--danger); }
+        .settings-form .color-indicator.correct { background: var(--success); }
+        .settings-form .color-indicator.semi-easy { background: var(--info); }
+        .settings-form .color-indicator.easy { background: var(--primary); }
+        .settings-form .color-indicator.one-month { background: var(--warning); }
+        .settings-form .color-indicator.two-months { background: var(--accent); }
+
+        /* Direction options */
+        .direction-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .direction-option {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.875rem 1rem;
+            border: 2px solid transparent;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all var(--transition);
+            background: rgba(99, 102, 241, 0.03);
+        }
+
+        .direction-option:hover {
+            background: rgba(99, 102, 241, 0.06);
+        }
+
+        .direction-option.selected {
+            border-color: var(--primary);
+            background: var(--primary-subtle);
+        }
+
+        .direction-option input[type="radio"] {
+            display: none;
+        }
+
+        .direction-radio {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--gray-300);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+
+        .direction-option.selected .direction-radio {
+            border-color: var(--primary);
+        }
+
+        .direction-option.selected .direction-radio::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: radioIn 0.2s ease;
+        }
+
+        @keyframes radioIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        .direction-label {
+            flex: 1;
+        }
+
+        .direction-label strong {
+            display: block;
+            color: var(--gray-800);
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 0.125rem;
+        }
+
+        .direction-label span {
+            font-size: 0.75rem;
+            color: var(--gray-400);
+        }
+
+        .settings-divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.15), transparent);
+            margin: 1.5rem 0;
+        }
+
+        .settings-section-title {
+            font-size: 0.7rem;
+            color: var(--gray-400);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .settings-section-title.danger {
+            color: var(--danger);
+            margin-top: 0.5rem;
+        }
+
+        .delete-all-btn {
+            width: 100%;
+            padding: 0.875rem;
+            background: rgba(239, 68, 68, 0.04);
+            color: var(--danger);
+            border: 2px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .delete-all-btn:hover {
+            background: var(--danger-light);
+            border-color: var(--danger);
+            transform: translateY(-1px);
+        }
+
+        /* ============================================
+           SCAN MODAL
+           ============================================ */
+        .scan-modal .modal {
+            max-width: 560px;
+        }
+
+        .camera-container {
+            position: relative;
+            width: 100%;
+            background: var(--gray-900);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+
+        .camera-container video {
+            width: 100%;
+            display: block;
+        }
+
+        .camera-container canvas {
+            display: none;
+        }
+
+        .captured-image {
+            width: 100%;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+        }
+
+        .scan-status {
+            text-align: center;
+            padding: 1rem;
+            color: var(--gray-600);
+            font-size: 0.9rem;
+        }
+
+        .scan-status.loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .scan-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(99, 102, 241, 0.2);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .scan-result {
+            background: rgba(99, 102, 241, 0.04);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            border: 1px solid rgba(99, 102, 241, 0.1);
+        }
+
+        .scan-result-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .scan-result-row:last-child { margin-bottom: 0; }
+
+        .scan-result-label {
+            font-size: 0.8rem;
+            color: var(--gray-500);
+            font-weight: 600;
+            min-width: 70px;
+        }
+
+        .scan-result-value {
+            flex: 1;
+        }
+
+        .scan-result-value.editable {
+            padding: 0.5rem 0.75rem;
+            border: 2px solid transparent;
+            border-radius: var(--radius);
+            background: rgba(99, 102, 241, 0.04);
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all var(--transition);
+        }
+
+        .scan-result-value.editable:focus {
+            outline: none;
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: 0 0 0 4px var(--primary-subtle);
+        }
+
+        .camera-buttons {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .capture-btn {
+            flex: 1;
+            padding: 0.875rem;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .capture-btn:hover { transform: translateY(-1px); }
+        .capture-btn:disabled { background: var(--gray-300); cursor: not-allowed; transform: none; }
+        .capture-btn svg { width: 20px; height: 20px; }
+
+        .retake-btn {
+            padding: 0.875rem 1.25rem;
+            background: var(--gray-100);
+            color: var(--gray-600);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius);
+            font-size: 0.95rem;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+
+        .retake-btn:hover { background: var(--gray-200); color: var(--gray-700); }
+
+        .scan-error {
+            background: var(--danger-light);
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .scan-progress {
+            margin-top: 0.5rem;
+            height: 4px;
+            background: var(--gray-200);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .scan-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+
+        /* ============================================
+           RESPONSIVE
+           ============================================ */
+        @media (max-width: 480px) {
+            .app-wrapper {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.625rem;
+            }
+
+            .form-row {
+                flex-direction: column;
+            }
+
+            .flashcard {
+                height: 200px;
+            }
+
+            .flashcard-face {
+                font-size: 1.5rem;
+                padding: 2rem 1.5rem 1.25rem;
+            }
+
+            .review-buttons {
+                flex-direction: column;
+            }
+
+            .review-btn {
+                width: 100%;
+            }
+
+            .due-count {
+                font-size: 3.25rem;
+            }
+
+            .fab-settings {
+                bottom: max(1.5rem, env(safe-area-inset-bottom, 1.5rem));
+                right: 1rem;
+                width: 50px;
+                height: 50px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-wrapper" id="appWrapper">
+
+        <!-- HEADER -->
+        <header class="header">
+            <h1>Ultimate Flashcards</h1>
+            <p class="subtitle">Master German vocabulary</p>
+        </header>
+
+        <!-- STUDY STATUS BANNER -->
+        <div class="glass-card study-status" id="studyStatus">
+            <div class="due-count" id="dueCount">0</div>
+            <div class="due-label">cards due for review</div>
+            <button class="study-btn" id="studyBtn" onclick="startStudyMode()">Study Now</button>
+            <div class="direction-badge" id="directionBadge">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                </svg>
+                <span id="directionBadgeText">DE → EN</span>
+            </div>
+        </div>
+
+        <!-- ADD CARD FORM -->
+        <div class="glass-card" id="addForm">
+            <div class="section-label">Add New Card</div>
+            <div class="form-row">
+                <input type="text" id="germanInput" placeholder="German word" autocomplete="off">
+                <input type="text" id="englishInput" placeholder="English translation" autocomplete="off">
+            </div>
+            <div class="form-row">
+                <input type="text" id="exampleInput" placeholder="Example sentence (optional)" autocomplete="off">
+            </div>
+            <button class="btn-primary" onclick="addCard()">Add Card</button>
+            <button class="btn-scan" onclick="openScanModal()">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Scan Word with Camera
+            </button>
+        </div>
+
+        <!-- IMPORT / EXPORT -->
+        <div class="glass-card" id="importExportSection">
+            <div class="section-label">Import / Export</div>
+            <div class="import-export-buttons">
+                <div class="file-input-wrapper">
+                    <input type="file" id="csvFileInput" accept=".csv" onchange="importCSV(event)">
+                    <div class="file-btn">📂 Import CSV</div>
+                </div>
+                <button onclick="exportCSV()">📤 Export CSV</button>
+            </div>
+            <div class="import-result" id="importResult" style="display: none;"></div>
+        </div>
+
+        <!-- STUDY COMPLETE -->
+        <div class="glass-card study-complete" id="studyComplete" style="display: none;">
+            <h2>🎉 All Done!</h2>
+            <p>You've reviewed all due cards. Great work!</p>
+            <button class="study-btn" onclick="exitStudyMode()">Back to Home</button>
+        </div>
+
+        <!-- FLASHCARD SECTION -->
+        <div class="flashcard-section" id="flashcardSection" style="display: none;">
+            <button class="exit-study-btn" id="exitStudyBtn" onclick="exitStudyMode()" style="display: none;">← Exit Study Mode</button>
+            <div class="flashcard-container">
+                <div class="flashcard-direction" id="flashcardDirection">DE → EN</div>
+                <button class="flashcard-edit-btn" onclick="editCurrentCard(event)">Edit</button>
+                <div class="flashcard" id="flashcard" onclick="flipCard()">
+                    <div class="flashcard-face flashcard-front">
+                        <span id="frontWord"></span>
+                    </div>
+                    <div class="flashcard-face flashcard-back">
+                        <span id="backWord"></span>
+                        <div class="example" id="exampleSentence"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-counter" id="cardCounter"></div>
+            <div class="flip-hint" id="flipHint">Tap card to reveal answer</div>
+
+            <!-- Review Buttons -->
+            <div class="review-buttons" id="reviewButtons">
+                <button class="review-btn wrong" onclick="markWrong()">Wrong</button>
+                <button class="review-btn correct" onclick="markCorrect()">Correct</button>
+                <button class="review-btn semi-easy" onclick="markSemiEasy()">Semi-easy</button>
+                <button class="review-btn easy" onclick="markEasy()">Easy</button>
+                <button class="review-btn one-month" onclick="markOneMonth()">1 Month</button>
+                <button class="review-btn two-months" onclick="markTwoMonths()">2 Months</button>
+            </div>
+
+            <!-- Scheduling Preview -->
+            <div class="scheduling-preview" id="schedulingPreview">
+                <div class="preview-title">Next review</div>
+                <div class="preview-options">
+                    <div class="preview-option wrong">
+                        <div class="preview-label">Wrong</div>
+                        <div class="preview-date" id="previewWrong"></div>
+                    </div>
+                    <div class="preview-option correct">
+                        <div class="preview-label">Correct</div>
+                        <div class="preview-date" id="previewCorrect"></div>
+                    </div>
+                    <div class="preview-option semi-easy">
+                        <div class="preview-label">Semi-easy</div>
+                        <div class="preview-date" id="previewSemiEasy"></div>
+                    </div>
+                    <div class="preview-option easy">
+                        <div class="preview-label">Easy</div>
+                        <div class="preview-date" id="previewEasy"></div>
+                    </div>
+                    <div class="preview-option one-month">
+                        <div class="preview-label">1 Month</div>
+                        <div class="preview-date" id="previewOneMonth"></div>
+                    </div>
+                    <div class="preview-option two-months">
+                        <div class="preview-label">2 Months</div>
+                        <div class="preview-date" id="previewTwoMonths"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nav Buttons (browse mode) -->
+            <div class="nav-buttons" id="navButtons">
+                <button onclick="prevCard()" id="prevBtn">← Previous</button>
+                <button onclick="nextCard()" id="nextBtn">Next →</button>
+            </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <p>No flashcards yet. Add your first card above!</p>
+        </div>
+
+        <!-- CARD LIST -->
+        <div class="glass-card card-list-section" id="cardListSection">
+            <div class="section-label">All Cards</div>
+            <ul id="cardList">
+                <li class="empty-state">No cards added yet</li>
+            </ul>
+        </div>
+
+        <!-- EDIT MODAL -->
+        <div class="modal-overlay" id="editModal">
+            <div class="modal">
+                <h2>✏️ Edit Card</h2>
+                <div class="form-group">
+                    <label for="editGermanInput">German</label>
+                    <input type="text" id="editGermanInput">
+                </div>
+                <div class="form-group">
+                    <label for="editEnglishInput">English</label>
+                    <input type="text" id="editEnglishInput">
+                </div>
+                <div class="form-group">
+                    <label for="editExampleInput">Example sentence</label>
+                    <input type="text" id="editExampleInput">
+                </div>
+                <div class="modal-buttons">
+                    <button class="cancel-btn" onclick="closeEditModal()">Cancel</button>
+                    <button class="save-btn" onclick="saveEdit()">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCAN MODAL -->
+        <div class="modal-overlay scan-modal" id="scanModal">
+            <div class="modal">
+                <h2>📷 Scan German Word</h2>
+
+                <!-- Camera View -->
+                <div id="cameraView">
+                    <div class="camera-container">
+                        <video id="scanVideo" autoplay playsinline></video>
+                        <canvas id="scanCanvas"></canvas>
+                    </div>
+                    <div class="camera-buttons">
+                        <button class="capture-btn" onclick="captureImage()">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Capture
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Processing View -->
+                <div id="processingView" style="display: none;">
+                    <img id="capturedImage" class="captured-image" alt="Captured">
+                    <div class="scan-status loading" id="scanStatus">
+                        <div class="scan-spinner"></div>
+                        <span id="scanStatusText">Recognizing text...</span>
+                    </div>
+                    <div class="scan-progress" id="scanProgress" style="display: none;">
+                        <div class="scan-progress-bar" id="scanProgressBar" style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- Error View -->
+                <div id="errorView" style="display: none;">
+                    <div class="scan-error" id="scanError"></div>
+                    <button class="retake-btn" onclick="retakeScan()" style="width: 100%;">Try Again</button>
+                </div>
+
+                <!-- Result View -->
+                <div id="resultView" style="display: none;">
+                    <img id="resultImage" class="captured-image" alt="Captured">
+                    <div class="scan-result">
+                        <div class="scan-result-row">
+                            <span class="scan-result-label">German:</span>
+                            <input type="text" class="scan-result-value editable" id="scannedGerman">
+                        </div>
+                        <div class="scan-result-row">
+                            <span class="scan-result-label">English:</span>
+                            <input type="text" class="scan-result-value editable" id="scannedEnglish">
+                        </div>
+                    </div>
+                    <div class="camera-buttons">
+                        <button class="retake-btn" onclick="retakeScan()">Retake</button>
+                        <button class="capture-btn" onclick="saveScannedCard()">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Save Card
+                        </button>
+                    </div>
+                </div>
+
+                <div class="modal-buttons" style="margin-top: 1rem;">
+                    <button class="cancel-btn" onclick="closeScanModal()" style="flex: 1;">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS MODAL -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <h2>⚙️ Settings</h2>
+                <div class="settings-form">
+                    <div class="settings-section-title">Study Direction</div>
+                    <div class="direction-options" id="directionOptions">
+                        <label class="direction-option selected" data-direction="de-en">
+                            <input type="radio" name="studyDirection" value="de-en" checked>
+                            <div class="direction-radio"></div>
+                            <div class="direction-label">
+                                <strong>German → English</strong>
+                                <span>See German word, reveal English translation</span>
+                            </div>
+                        </label>
+                        <label class="direction-option" data-direction="en-de">
+                            <input type="radio" name="studyDirection" value="en-de">
+                            <div class="direction-radio"></div>
+                            <div class="direction-label">
+                                <strong>English → German</strong>
+                                <span>See English word, reveal German translation</span>
+                            </div>
+                        </label>
+                        <label class="direction-option" data-direction="mixed">
+                            <input type="radio" name="studyDirection" value="mixed">
+                            <div class="direction-radio"></div>
+                            <div class="direction-label">
+                                <strong>Mixed / Both</strong>
+                                <span>Random mix of both directions</span>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="settings-divider"></div>
+                    <div class="settings-section-title">Review Intervals</div>
+
+                    <div class="form-group">
+                        <label><span class="color-indicator wrong"></span> Wrong — review again in</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="intervalWrong" min="1" max="365" value="1">
+                            <span class="input-suffix">day(s)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><span class="color-indicator correct"></span> Correct — review again in</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="intervalCorrect" min="1" max="365" value="3">
+                            <span class="input-suffix">day(s)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><span class="color-indicator semi-easy"></span> Semi-easy — review again in</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="intervalSemiEasy" min="1" max="365" value="7">
+                            <span class="input-suffix">day(s)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><span class="color-indicator easy"></span> Easy — review again in</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="intervalEasy" min="1" max="365" value="14">
+                            <span class="input-suffix">day(s)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><span class="color-indicator one-month"></span> 1 Month — review again in</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="intervalOneMonth" min="1" max="365" value="30">
+                            <span class="input-suffix">day(s)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label><span class="color-indicator two-months"></span> 2 Months — review again in</label>
+                        <div class="input-with-suffix">
+                            <input type="number" id="intervalTwoMonths" min="1" max="365" value="60">
+                            <span class="input-suffix">day(s)</span>
+                        </div>
+                    </div>
+
+                    <div class="settings-divider"></div>
+                    <div class="settings-section-title danger">⚠️ Danger Zone</div>
+                    <button class="delete-all-btn" onclick="deleteAllData()">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete All Data
+                    </button>
+                </div>
+                <div class="modal-buttons">
+                    <button class="cancel-btn" onclick="closeSettingsModal()">Cancel</button>
+                    <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLOATING SETTINGS BUTTON -->
+    <button class="fab-settings" id="fabSettings" onclick="openSettingsModal()" title="Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+    </button>
+
+    <!-- ============================================
+         JAVASCRIPT
+         ============================================ -->
+    <script>
+        // ============================================
+        // STATE
+        // ============================================
+        let cards = [];
+        let currentIndex = 0;
+        let studyMode = false;
+        let studyQueue = [];
+        let studyIndex = 0;
+        let editingIndex = -1;
+        let currentCardDirection = 'de-en';
+
+        const DEFAULT_SETTINGS = {
+            intervalWrong: 1,
+            intervalCorrect: 3,
+            intervalSemiEasy: 7,
+            intervalEasy: 14,
+            intervalOneMonth: 30,
+            intervalTwoMonths: 60,
+            studyDirection: 'de-en'
+        };
+
+        let settings = { ...DEFAULT_SETTINGS };
+
+        // ============================================
+        // UTILITY HELPERS
+        // ============================================
+        function getToday() {
+            const now = new Date();
+            return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        }
+
+        function addDays(timestamp, days) {
+            return timestamp + (days * 24 * 60 * 60 * 1000);
+        }
+
+        function isDue(card) {
+            if (!card.nextReview) return true;
+            return card.nextReview <= getToday();
+        }
+
+        function getDueCards() {
+            return cards.filter(isDue);
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'New';
+            const today = getToday();
+            const tomorrow = addDays(today, 1);
+            if (timestamp <= today) return 'Due now';
+            if (timestamp <= tomorrow) return 'Tomorrow';
+            const daysUntil = Math.ceil((timestamp - today) / (24 * 60 * 60 * 1000));
+            if (daysUntil <= 7) return `In ${daysUntil} days`;
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        function formatInterval(days) {
+            if (days === 1) return 'Tomorrow';
+            if (days < 7) return `In ${days} days`;
+            if (days === 7) return 'In 1 week';
+            if (days === 14) return 'In 2 weeks';
+            if (days < 30) return `In ${days} days`;
+            if (days === 30) return 'In 1 month';
+            if (days === 60) return 'In 2 months';
+            return `In ${days} days`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ============================================
+        // SETTINGS PERSISTENCE
+        // ============================================
+        function loadSettings() {
+            const stored = localStorage.getItem('germanFlashcardsSettings');
+            if (stored) {
+                settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+            }
+        }
+
+        function saveSettingsToStorage() {
+            localStorage.setItem('germanFlashcardsSettings', JSON.stringify(settings));
+        }
+
+        // ============================================
+        // CARD PERSISTENCE
+        // ============================================
+        function loadCards() {
+            const stored = localStorage.getItem('germanFlashcards');
+            if (stored) {
+                cards = JSON.parse(stored);
+                cards = cards.map(card => ({
+                    ...card,
+                    level: card.level || 0,
+                    nextReview: card.nextReview || null,
+                    lastReview: card.lastReview || null,
+                    example: card.example || ''
+                }));
+            }
+            updateDisplay();
+        }
+
+        function saveCards() {
+            localStorage.setItem('germanFlashcards', JSON.stringify(cards));
+        }
+
+        // ============================================
+        // CARD OPERATIONS
+        // ============================================
+        function addCard() {
+            const germanInput = document.getElementById('germanInput');
+            const englishInput = document.getElementById('englishInput');
+            const exampleInput = document.getElementById('exampleInput');
+
+            const german = germanInput.value.trim();
+            const english = englishInput.value.trim();
+            const example = exampleInput.value.trim();
+
+            if (!german || !english) {
+                alert('Please enter both German and English words');
+                return;
+            }
+
+            cards.push({
+                german, english, example,
+                level: 0, nextReview: null, lastReview: null
+            });
+            saveCards();
+
+            germanInput.value = '';
+            englishInput.value = '';
+            exampleInput.value = '';
+
+            currentIndex = cards.length - 1;
+            updateDisplay();
+        }
+
+        function deleteCard(index) {
+            cards.splice(index, 1);
+            saveCards();
+            if (currentIndex >= cards.length) {
+                currentIndex = Math.max(0, cards.length - 1);
+            }
+            updateDisplay();
+        }
+
+        // ============================================
+        // STUDY MODE
+        // ============================================
+        function startStudyMode() {
+            studyQueue = getDueCards();
+            if (studyQueue.length === 0) return;
+
+            studyMode = true;
+            studyIndex = 0;
+
+            document.getElementById('addForm').style.display = 'none';
+            document.getElementById('importExportSection').style.display = 'none';
+            document.getElementById('studyStatus').style.display = 'none';
+            document.getElementById('cardListSection').style.display = 'none';
+            document.getElementById('exitStudyBtn').style.display = 'block';
+            document.getElementById('navButtons').style.display = 'none';
+            document.getElementById('studyComplete').style.display = 'none';
+
+            updateStudyCard();
+        }
+
+        function exitStudyMode() {
+            studyMode = false;
+            studyQueue = [];
+
+            document.getElementById('addForm').style.display = 'block';
+            document.getElementById('importExportSection').style.display = 'block';
+            document.getElementById('studyStatus').style.display = 'block';
+            document.getElementById('cardListSection').style.display = 'block';
+            document.getElementById('exitStudyBtn').style.display = 'none';
+            document.getElementById('navButtons').style.display = 'flex';
+            document.getElementById('studyComplete').style.display = 'none';
+
+            updateDisplay();
+        }
+
+        function getDirectionLabel(direction) {
+            switch (direction) {
+                case 'de-en': return 'DE → EN';
+                case 'en-de': return 'EN → DE';
+                case 'mixed': return 'Mixed';
+                default: return 'DE → EN';
+            }
+        }
+
+        function getCardDirection() {
+            if (settings.studyDirection === 'mixed') {
+                return Math.random() < 0.5 ? 'de-en' : 'en-de';
+            }
+            return settings.studyDirection;
+        }
+
+        function updateStudyCard() {
+            if (studyIndex >= studyQueue.length) {
+                document.getElementById('flashcardSection').style.display = 'none';
+                document.getElementById('studyComplete').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('flashcardSection').style.display = 'block';
+            document.getElementById('studyComplete').style.display = 'none';
+
+            const flashcard = document.getElementById('flashcard');
+            flashcard.classList.add('no-transition');
+            flashcard.classList.remove('flipped');
+
+            const card = studyQueue[studyIndex];
+            currentCardDirection = getCardDirection();
+
+            if (currentCardDirection === 'en-de') {
+                document.getElementById('frontWord').textContent = card.english;
+                document.getElementById('backWord').textContent = card.german;
+                document.getElementById('flashcardDirection').textContent = 'EN → DE';
+            } else {
+                document.getElementById('frontWord').textContent = card.german;
+                document.getElementById('backWord').textContent = card.english;
+                document.getElementById('flashcardDirection').textContent = 'DE → EN';
+            }
+
+            document.getElementById('exampleSentence').textContent = card.example || '';
+            document.getElementById('cardCounter').textContent = `${studyIndex + 1} / ${studyQueue.length}`;
+
+            // Update scheduling preview
+            document.getElementById('previewWrong').textContent = formatInterval(settings.intervalWrong);
+            document.getElementById('previewCorrect').textContent = formatInterval(settings.intervalCorrect);
+            document.getElementById('previewSemiEasy').textContent = formatInterval(settings.intervalSemiEasy);
+            document.getElementById('previewEasy').textContent = formatInterval(settings.intervalEasy);
+            document.getElementById('previewOneMonth').textContent = formatInterval(settings.intervalOneMonth);
+            document.getElementById('previewTwoMonths').textContent = formatInterval(settings.intervalTwoMonths);
+
+            void flashcard.offsetWidth;
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    flashcard.classList.remove('no-transition');
+                });
+            });
+
+            document.getElementById('reviewButtons').classList.remove('visible');
+            document.getElementById('schedulingPreview').classList.remove('visible');
+            document.getElementById('flipHint').style.display = 'block';
+        }
+
+        // ============================================
+        // REVIEW
+        // ============================================
+        function reviewCard(gradeKey, levelIncrement) {
+            const card = studyQueue[studyIndex];
+            const cardIndex = cards.findIndex(c => c.german === card.german && c.english === card.english);
+
+            if (cardIndex !== -1) {
+                cards[cardIndex].level = Math.min((cards[cardIndex].level || 0) + levelIncrement, 10);
+                cards[cardIndex].nextReview = addDays(getToday(), settings[gradeKey]);
+                cards[cardIndex].lastReview = Date.now();
+                saveCards();
+            }
+
+            studyIndex++;
+            updateStudyCard();
+        }
+
+        function markWrong()     { reviewCard('intervalWrong', 0); }
+        function markCorrect()   { reviewCard('intervalCorrect', 1); }
+        function markSemiEasy()  { reviewCard('intervalSemiEasy', 1); }
+        function markEasy()      { reviewCard('intervalEasy', 2); }
+        function markOneMonth()  { reviewCard('intervalOneMonth', 3); }
+        function markTwoMonths() { reviewCard('intervalTwoMonths', 4); }
+
+        // ============================================
+        // FLASHCARD INTERACTION
+        // ============================================
+        function flipCard() {
+            const flashcard = document.getElementById('flashcard');
+            flashcard.classList.toggle('flipped');
+
+            if (studyMode && flashcard.classList.contains('flipped')) {
+                document.getElementById('reviewButtons').classList.add('visible');
+                document.getElementById('schedulingPreview').classList.add('visible');
+                document.getElementById('flipHint').style.display = 'none';
+            }
+        }
+
+        function prevCard() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                resetFlipAndUpdate();
+            }
+        }
+
+        function nextCard() {
+            if (currentIndex < cards.length - 1) {
+                currentIndex++;
+                resetFlipAndUpdate();
+            }
+        }
+
+        function resetFlipAndUpdate() {
+            const flashcard = document.getElementById('flashcard');
+            flashcard.classList.add('no-transition');
+            flashcard.classList.remove('flipped');
+            updateFlashcard();
+            void flashcard.offsetWidth;
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    flashcard.classList.remove('no-transition');
+                });
+            });
+        }
+
+        function updateFlashcard() {
+            if (cards.length === 0) return;
+
+            const card = cards[currentIndex];
+            const direction = settings.studyDirection === 'mixed' ? 'de-en' : settings.studyDirection;
+
+            if (direction === 'en-de') {
+                document.getElementById('frontWord').textContent = card.english;
+                document.getElementById('backWord').textContent = card.german;
+                document.getElementById('flashcardDirection').textContent = 'EN → DE';
+            } else {
+                document.getElementById('frontWord').textContent = card.german;
+                document.getElementById('backWord').textContent = card.english;
+                document.getElementById('flashcardDirection').textContent = 'DE → EN';
+            }
+
+            document.getElementById('exampleSentence').textContent = card.example || '';
+            document.getElementById('cardCounter').textContent = `${currentIndex + 1} / ${cards.length}`;
+
+            document.getElementById('prevBtn').disabled = currentIndex === 0;
+            document.getElementById('nextBtn').disabled = currentIndex === cards.length - 1;
+        }
+
+        // ============================================
+        // DISPLAY UPDATES
+        // ============================================
+        function updateCardList() {
+            const list = document.getElementById('cardList');
+
+            if (cards.length === 0) {
+                list.innerHTML = '<li class="empty-state">No cards added yet</li>';
+                return;
+            }
+
+            const today = getToday();
+
+            list.innerHTML = cards.map((card, index) => {
+                const dueStatus = formatDate(card.nextReview);
+                const isDueNow = !card.nextReview || card.nextReview <= today;
+                const isDueToday = card.nextReview && card.nextReview <= addDays(today, 1);
+
+                let statusClass = '';
+                if (isDueNow) statusClass = 'due';
+                else if (isDueToday) statusClass = 'due-today';
+
+                let nextReviewText = '';
+                if (card.nextReview) {
+                    const nextDate = new Date(card.nextReview);
+                    nextReviewText = nextDate.toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric',
+                        year: nextDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                    });
+                }
+
+                return `
+                    <li>
+                        <div class="card-info">
+                            <div class="card-text">
+                                <span class="german">${escapeHtml(card.german)}</span>
+                                <span class="english">${escapeHtml(card.english)}</span>
+                            </div>
+                            ${card.example ? `<div class="card-example">${escapeHtml(card.example)}</div>` : ''}
+                            <div class="card-meta">
+                                <span class="${statusClass}">${dueStatus}</span>
+                                ${nextReviewText && !isDueNow ? ` · ${nextReviewText}` : ''}
+                                ${card.level > 0 ? ` · Level ${card.level}` : ''}
+                            </div>
+                        </div>
+                        <div class="card-actions">
+                            <button class="edit-btn" onclick="openEditModal(${index})">Edit</button>
+                            <button class="delete-btn" onclick="deleteCard(${index})">×</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        function updateStudyStatus() {
+            const dueCards = getDueCards();
+            const dueCount = document.getElementById('dueCount');
+            const studyBtn = document.getElementById('studyBtn');
+
+            dueCount.textContent = dueCards.length;
+            dueCount.classList.toggle('none', dueCards.length === 0);
+            studyBtn.disabled = dueCards.length === 0;
+
+            if (dueCards.length === 0) {
+                studyBtn.textContent = 'All caught up! ✨';
+            } else {
+                studyBtn.textContent = 'Study Now';
+            }
+        }
+
+        function updateDirectionBadge() {
+            document.getElementById('directionBadgeText').textContent = getDirectionLabel(settings.studyDirection);
+        }
+
+        function updateDisplay() {
+            const flashcardSection = document.getElementById('flashcardSection');
+            const emptyState = document.getElementById('emptyState');
+            const navButtons = document.getElementById('navButtons');
+            const reviewButtons = document.getElementById('reviewButtons');
+            const flipHint = document.getElementById('flipHint');
+
+            updateStudyStatus();
+
+            if (cards.length === 0) {
+                flashcardSection.style.display = 'none';
+                emptyState.style.display = 'block';
+            } else {
+                flashcardSection.style.display = 'block';
+                emptyState.style.display = 'none';
+                navButtons.style.display = 'flex';
+                reviewButtons.classList.remove('visible');
+                flipHint.style.display = 'block';
+                updateFlashcard();
+            }
+
+            updateCardList();
+        }
+
+        // ============================================
+        // EDIT MODAL
+        // ============================================
+        function openEditModal(index) {
+            editingIndex = index;
+            const card = cards[index];
+            document.getElementById('editGermanInput').value = card.german;
+            document.getElementById('editEnglishInput').value = card.english;
+            document.getElementById('editExampleInput').value = card.example || '';
+            document.getElementById('editModal').classList.add('visible');
+            document.getElementById('editGermanInput').focus();
+        }
+
+        function closeEditModal() {
+            editingIndex = -1;
+            document.getElementById('editModal').classList.remove('visible');
+        }
+
+        function saveEdit() {
+            if (editingIndex === -1) return;
+
+            const german = document.getElementById('editGermanInput').value.trim();
+            const english = document.getElementById('editEnglishInput').value.trim();
+            const example = document.getElementById('editExampleInput').value.trim();
+
+            if (!german || !english) {
+                alert('Please enter both German and English words');
+                return;
+            }
+
+            cards[editingIndex].german = german;
+            cards[editingIndex].english = english;
+            cards[editingIndex].example = example;
+
+            saveCards();
+            closeEditModal();
+            updateDisplay();
+
+            if (studyMode && studyQueue[studyIndex]) {
+                const card = cards[editingIndex];
+                const queueCard = studyQueue[studyIndex];
+                if (queueCard.german === card.german || queueCard.english === card.english) {
+                    studyQueue[studyIndex] = { ...card };
+                    updateStudyCard();
+                }
+            }
+        }
+
+        function editCurrentCard(event) {
+            event.stopPropagation();
+            if (studyMode) {
+                const card = studyQueue[studyIndex];
+                const index = cards.findIndex(c => c.german === card.german && c.english === card.english);
+                if (index !== -1) openEditModal(index);
+            } else {
+                openEditModal(currentIndex);
+            }
+        }
+
+        // ============================================
+        // SETTINGS MODAL
+        // ============================================
+        function openSettingsModal() {
+            document.getElementById('fabSettings').classList.add('active');
+            document.getElementById('intervalWrong').value = settings.intervalWrong;
+            document.getElementById('intervalCorrect').value = settings.intervalCorrect;
+            document.getElementById('intervalSemiEasy').value = settings.intervalSemiEasy;
+            document.getElementById('intervalEasy').value = settings.intervalEasy;
+            document.getElementById('intervalOneMonth').value = settings.intervalOneMonth || 30;
+            document.getElementById('intervalTwoMonths').value = settings.intervalTwoMonths || 60;
+
+            const directionOptions = document.querySelectorAll('.direction-option');
+            directionOptions.forEach(option => {
+                const direction = option.dataset.direction;
+                const radio = option.querySelector('input[type="radio"]');
+                if (direction === settings.studyDirection) {
+                    option.classList.add('selected');
+                    radio.checked = true;
+                } else {
+                    option.classList.remove('selected');
+                    radio.checked = false;
+                }
+            });
+
+            document.getElementById('settingsModal').classList.add('visible');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('fabSettings').classList.remove('active');
+            document.getElementById('settingsModal').classList.remove('visible');
+        }
+
+        function saveSettings() {
+            const intervalWrong = parseInt(document.getElementById('intervalWrong').value) || 1;
+            const intervalCorrect = parseInt(document.getElementById('intervalCorrect').value) || 3;
+            const intervalSemiEasy = parseInt(document.getElementById('intervalSemiEasy').value) || 7;
+            const intervalEasy = parseInt(document.getElementById('intervalEasy').value) || 14;
+            const intervalOneMonth = parseInt(document.getElementById('intervalOneMonth').value) || 30;
+            const intervalTwoMonths = parseInt(document.getElementById('intervalTwoMonths').value) || 60;
+
+            const selectedDirection = document.querySelector('input[name="studyDirection"]:checked');
+            const studyDirection = selectedDirection ? selectedDirection.value : 'de-en';
+
+            settings.intervalWrong = Math.max(1, Math.min(365, intervalWrong));
+            settings.intervalCorrect = Math.max(1, Math.min(365, intervalCorrect));
+            settings.intervalSemiEasy = Math.max(1, Math.min(365, intervalSemiEasy));
+            settings.intervalEasy = Math.max(1, Math.min(365, intervalEasy));
+            settings.intervalOneMonth = Math.max(1, Math.min(365, intervalOneMonth));
+            settings.intervalTwoMonths = Math.max(1, Math.min(365, intervalTwoMonths));
+            settings.studyDirection = studyDirection;
+
+            saveSettingsToStorage();
+            updateDirectionBadge();
+            closeSettingsModal();
+
+            if (!studyMode && cards.length > 0) {
+                updateFlashcard();
+            }
+        }
+
+        function deleteAllData() {
+            if (confirm("⚠️ Are you sure you want to delete ALL cards and settings?\n\nThis action cannot be undone.")) {
+                localStorage.removeItem('germanFlashcards');
+                localStorage.removeItem('germanFlashcardsSettings');
+                location.reload();
+            }
+        }
+
+        // ============================================
+        // CSV IMPORT / EXPORT
+        // ============================================
+        function parseCSV(text) {
+            const lines = text.split(/\r?\n/);
+            const results = [];
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+
+                const fields = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        if (inQuotes && line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        fields.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                fields.push(current.trim());
+
+                if (fields.length >= 2 && fields[0] && fields[1]) {
+                    results.push({
+                        german: fields[0],
+                        english: fields[1],
+                        example: fields[2] || ''
+                    });
+                }
+            }
+
+            return results;
+        }
+
+        function importCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const resultDiv = document.getElementById('importResult');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const text = e.target.result;
+                    const parsed = parseCSV(text);
+
+                    if (parsed.length === 0) {
+                        resultDiv.textContent = 'No valid cards found. Format: German,English,Example (optional)';
+                        resultDiv.className = 'import-result error';
+                        resultDiv.style.display = 'block';
+                        return;
+                    }
+
+                    let added = 0;
+                    for (const item of parsed) {
+                        const exists = cards.some(c =>
+                            c.german.toLowerCase() === item.german.toLowerCase() &&
+                            c.english.toLowerCase() === item.english.toLowerCase()
+                        );
+
+                        if (!exists) {
+                            cards.push({
+                                german: item.german,
+                                english: item.english,
+                                example: item.example || '',
+                                level: 0, nextReview: null, lastReview: null
+                            });
+                            added++;
+                        }
+                    }
+
+                    saveCards();
+                    updateDisplay();
+
+                    const skipped = parsed.length - added;
+                    let message = `✅ Imported ${added} card${added !== 1 ? 's' : ''}`;
+                    if (skipped > 0) {
+                        message += ` (${skipped} duplicate${skipped !== 1 ? 's' : ''} skipped)`;
+                    }
+
+                    resultDiv.textContent = message;
+                    resultDiv.className = 'import-result success';
+                    resultDiv.style.display = 'block';
+
+                    event.target.value = '';
+
+                    setTimeout(() => { resultDiv.style.display = 'none'; }, 5000);
+
+                } catch (err) {
+                    resultDiv.textContent = 'Error reading CSV: ' + err.message;
+                    resultDiv.className = 'import-result error';
+                    resultDiv.style.display = 'block';
+                }
+            };
+
+            reader.readAsText(file);
+        }
+
+        function exportCSV() {
+            if (cards.length === 0) {
+                alert('No cards to export');
+                return;
+            }
+
+            let csv = 'German,English,Example\n';
+
+            for (const card of cards) {
+                const german = card.german.includes(',') || card.german.includes('"')
+                    ? '"' + card.german.replace(/"/g, '""') + '"'
+                    : card.german;
+                const english = card.english.includes(',') || card.english.includes('"')
+                    ? '"' + card.english.replace(/"/g, '""') + '"'
+                    : card.english;
+                const example = (card.example || '').includes(',') || (card.example || '').includes('"')
+                    ? '"' + (card.example || '').replace(/"/g, '""') + '"'
+                    : (card.example || '');
+                csv += `${german},${english},${example}\n`;
+            }
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'german-flashcards.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // ============================================
+        // SCAN (OCR) FEATURE
+        // ============================================
+        let scanStream = null;
+
+        async function openScanModal() {
+            const modal = document.getElementById('scanModal');
+            modal.classList.add('visible');
+            showScanView('camera');
+
+            try {
+                const video = document.getElementById('scanVideo');
+                scanStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                video.srcObject = scanStream;
+            } catch (err) {
+                console.error('Camera error:', err);
+                showScanError('Could not access camera. Please grant camera permissions.');
+            }
+        }
+
+        function closeScanModal() {
+            document.getElementById('scanModal').classList.remove('visible');
+            if (scanStream) {
+                scanStream.getTracks().forEach(track => track.stop());
+                scanStream = null;
+            }
+            document.getElementById('scanVideo').srcObject = null;
+        }
+
+        function showScanView(view) {
+            document.getElementById('cameraView').style.display = view === 'camera' ? 'block' : 'none';
+            document.getElementById('processingView').style.display = view === 'processing' ? 'block' : 'none';
+            document.getElementById('errorView').style.display = view === 'error' ? 'block' : 'none';
+            document.getElementById('resultView').style.display = view === 'result' ? 'block' : 'none';
+        }
+
+        function showScanError(message) {
+            document.getElementById('scanError').textContent = message;
+            showScanView('error');
+        }
+
+        function captureImage() {
+            const video = document.getElementById('scanVideo');
+            const canvas = document.getElementById('scanCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            const imageDataUrl = canvas.toDataURL('image/png');
+            document.getElementById('capturedImage').src = imageDataUrl;
+            document.getElementById('resultImage').src = imageDataUrl;
+
+            if (scanStream) {
+                scanStream.getTracks().forEach(track => track.stop());
+                scanStream = null;
+            }
+
+            showScanView('processing');
+            processImage(imageDataUrl);
+        }
+
+        async function processImage(imageDataUrl) {
+            const statusText = document.getElementById('scanStatusText');
+            const progressBar = document.getElementById('scanProgressBar');
+            const progressContainer = document.getElementById('scanProgress');
+
+            try {
+                progressContainer.style.display = 'block';
+                statusText.textContent = 'Initializing OCR...';
+
+                const result = await Tesseract.recognize(imageDataUrl, 'deu', {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const progress = Math.round(m.progress * 100);
+                            progressBar.style.width = progress + '%';
+                            statusText.textContent = `Recognizing text... ${progress}%`;
+                        } else if (m.status === 'loading language traineddata') {
+                            statusText.textContent = 'Loading German language data...';
+                        }
+                    }
+                });
+
+                let recognizedText = result.data.text.trim();
+
+                if (!recognizedText) {
+                    showScanError('No text detected. Please try again with clearer text.');
+                    return;
+                }
+
+                recognizedText = cleanupOcrText(recognizedText);
+                statusText.textContent = 'Translating...';
+                progressBar.style.width = '100%';
+
+                const translation = await translateToEnglish(recognizedText);
+
+                document.getElementById('scannedGerman').value = recognizedText;
+                document.getElementById('scannedEnglish').value = translation;
+                showScanView('result');
+
+            } catch (err) {
+                console.error('OCR error:', err);
+                showScanError('Error processing image: ' + err.message);
+            }
+        }
+
+        function cleanupOcrText(text) {
+            text = text.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+            const words = text.split(' ').filter(w => w.length > 0);
+            if (words.length > 3) return words.slice(0, 3).join(' ');
+            return text;
+        }
+
+        async function translateToEnglish(germanText) {
+            try {
+                const response = await fetch(
+                    `https://api.mymemory.translated.net/get?q=${encodeURIComponent(germanText)}&langpair=de|en`
+                );
+                if (!response.ok) throw new Error('Translation service unavailable');
+                const data = await response.json();
+                if (data.responseStatus === 200 && data.responseData && data.responseData.translatedText) {
+                    return data.responseData.translatedText;
+                }
+                return '';
+            } catch (err) {
+                console.error('Translation error:', err);
+                return '';
+            }
+        }
+
+        async function retakeScan() {
+            showScanView('camera');
+            try {
+                const video = document.getElementById('scanVideo');
+                scanStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                video.srcObject = scanStream;
+            } catch (err) {
+                console.error('Camera error:', err);
+                showScanError('Could not access camera. Please grant camera permissions.');
+            }
+        }
+
+        function saveScannedCard() {
+            const german = document.getElementById('scannedGerman').value.trim();
+            const english = document.getElementById('scannedEnglish').value.trim();
+
+            if (!german || !english) {
+                alert('Please enter both German and English words');
+                return;
+            }
+
+            const exists = cards.some(c => c.german.toLowerCase() === german.toLowerCase());
+            if (exists) {
+                if (!confirm('A card with this German word already exists. Add anyway?')) return;
+            }
+
+            cards.push({
+                german, english, example: '',
+                level: 0, nextReview: null, lastReview: null
+            });
+
+            saveCards();
+            closeScanModal();
+            currentIndex = cards.length - 1;
+            updateDisplay();
+        }
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (editingIndex !== -1) closeEditModal();
+                if (document.getElementById('settingsModal').classList.contains('visible')) closeSettingsModal();
+                if (document.getElementById('scanModal').classList.contains('visible')) closeScanModal();
+            }
+        });
+
+        document.getElementById('editModal').addEventListener('click', function(e) {
+            if (e.target === this) closeEditModal();
+        });
+
+        document.getElementById('settingsModal').addEventListener('click', function(e) {
+            if (e.target === this) closeSettingsModal();
+        });
+
+        document.getElementById('scanModal').addEventListener('click', function(e) {
+            if (e.target === this) closeScanModal();
+        });
+
+        // Direction option radio selection
+        document.querySelectorAll('.direction-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.direction-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                    opt.querySelector('input[type="radio"]').checked = false;
+                });
+                this.classList.add('selected');
+                this.querySelector('input[type="radio"]').checked = true;
+            });
+        });
+
+        // Enter key navigation for form fields
+        document.getElementById('germanInput').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('englishInput').focus(); });
+        document.getElementById('englishInput').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('exampleInput').focus(); });
+        document.getElementById('exampleInput').addEventListener('keypress', e => { if (e.key === 'Enter') addCard(); });
+        document.getElementById('editGermanInput').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('editEnglishInput').focus(); });
+        document.getElementById('editEnglishInput').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('editExampleInput').focus(); });
+        document.getElementById('editExampleInput').addEventListener('keypress', e => { if (e.key === 'Enter') saveEdit(); });
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        loadSettings();
+        updateDirectionBadge();
+        loadCards();
+
+        // ============================================
+        // PWA SERVICE WORKER
+        // ============================================
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered:', registration.scope);
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    console.log('New version available! Refresh to update.');
+                                }
+                            });
+                        });
+                    })
+                    .catch(error => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
